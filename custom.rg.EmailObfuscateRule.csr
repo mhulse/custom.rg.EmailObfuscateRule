@@ -1,0 +1,263 @@
+<csr:rule name="custom.rg.EmailObfuscateRule" match="custom:rg:email:obfuscate">
+	
+	<csr:class super="dt.common.page.Rule" />
+	
+	<csr:description>
+		
+		<h1>rg:email:obfuscate</h1>
+		
+		<ul>
+			<li><b>Author:</b> Micky Hulse</li>
+			<li><b>Created:</b> 2010/03/07</li>
+			<li><b>Modified:</b> 2011/04/04</li>
+			<li><b>About:</b> Obfuscates a given e-mail address.</li>
+		</ul>
+		
+		<hr>
+		
+		<h2>Example 01: Container tag</h2>
+		<example><custom:rg:email:obfuscate email="bob@bob.com" simple="" mode="" cc="bob@cc.com" bcc="bob@bcc.com" subject="My Subject" body="My body" id="myId" class="myClass" rel="myRel" title="Title goes here" text="" var="foo">#(foo)#</custom:rg:email:obfuscate></example>
+		
+		<h2>Example 02: Self-closing tag</h2>
+		<example><custom:rg:email:obfuscate email="bob@bob.com" simple="" mode="" cc="bob@cc.com" bcc="bob@bcc.com" subject="My Subject" body="My body" id="myId" class="myClass" rel="myRel" title="Title goes here" text="Click here to e-mail Bob" /></example>
+		
+		<h2>Example 03: Return just the obfuscated e-mail address</h2>
+		<example><custom:rg:email:obfuscate email="bob@bob.com" simple="true" /></example>
+		
+		<h2>Example 04: Return the obfuscated e-mail address and build the link manually</h2>
+		<example><custom:rg:email:obfuscate email="bob@bob.com" simple="true" var="foo"><a #("href=""&amp;#x6D;&amp;#97;&amp;#x69;&amp;#x6C;&amp;#x74;&amp;#x6F;&amp;#x3A;" _ foo _ """")#>#(foo)#</a></custom:rg:email:obfuscate></example>
+		
+		<hr>
+		
+		<p>A big thanks to <a href="http://tinyurl.com/ydj36cd">Eric & Ben</a></p>
+		
+		<p>Inspired by <a href="http://masugadesign.com/the-lab/scripts/spam-me-not/">md_spam_me_not</a> <a href="http://expressionengine.com/">Expression Engine</a> plugin.</p>
+		
+		<p>Find the latest version of this RULE on <a href="http://github.com/mhulse/rg-email-obfuscate">GitHub</a>.</p>
+		
+	</csr:description>
+	
+	<csr:attribute name="email" description="E-mail address to obfuscate. Required." type="email:STRING" required />
+	<csr:attribute name="simple" description="Set to 'true' if you want to return just the obfuscated e-mail address. Default is 'false'." type="simple:BOOLEAN" />
+	<csr:attribute name="mode" description="Obfuscation mode. 1 = decimal, 2 = hexidecimal, 3 = mixture of modes 1 and 2. Default is mode 3." type="mode:INTEGER" />
+	<csr:attribute name="cc" description="CC?" type="cc:STRING" />
+	<csr:attribute name="bcc" description="BCC?" type="bcc:STRING" />
+	<csr:attribute name="subject" description="Subject?" type="subject:STRING" />
+	<csr:attribute name="body" description="Body?" type="body:STRING" />
+	<csr:attribute name="id" description="Link 'id' attribute?" type="id:STRING" />
+	<csr:attribute name="class" description="Link 'class' attribute?" type="class:STRING" />
+	<csr:attribute name="rel" description="Link 'rel' attribute?" type="rel:STRING" />
+	<csr:attribute name="title" description="Link 'title' attribute? Note: This value is not obfuscated." type="title:STRING" />
+	<csr:attribute name="text" description="Link text. Default is the e-mail address." type="text:STRING" />
+	<csr:attribute name="var" description="Advanced: Local variable name to use when using this RULE as a container tag (vs. self-closing tag). Variable name MUST BE UNIQUE!" type="var:STRING" />
+		
+	<csr:action>
+		
+		<script language="cache" runat="compiler">
+			do ..RenderDTStartTag()
+		</script>
+		
+		<script language="cache" runat="server">
+			
+			//----------------------------------
+			// Declare:
+			//----------------------------------
+			
+			new csr
+			
+			//----------------------------------
+			// Get required RULE attribute:
+			//----------------------------------
+			
+			set csr("email") = ##'..GetAttribute("email", "")'##
+			
+			// Is there an e-mail?
+			if ($length(csr("email"))) {
+				
+				//----------------------------------
+				// Macro(s):
+				//----------------------------------
+				
+				/**
+				 * A macro that obfuscates a character in decimal and/or hexidecimal mode.
+				 * 
+				 * @param      Mode of obfuscation: 1 = decimal, 2 = hexidecimal, 3 = mixture of modes 1 and 2.
+				 * @param      Character to obfuscate.
+				 * @return     Obfuscated character.
+				 */
+				#define obfuscator(%mode, %char) "&#" _ $case($case(%mode, 3:($random(2) + 1), :%mode), 1:$ascii(%char), 2:"x" _ $zhex($ascii(%char)), :"") _ ";" // Decimal: PHP/ord() == COS/$ascii("char") ... Hexadecimal: PHP/dechex() == COS/$zhex($ascii("char"))
+				
+				//----------------------------------
+				// Initialize:
+				//----------------------------------
+				
+				set csr("return") = ""
+				set csr("i") = 0
+				
+				//----------------------------------
+				// Get RULE attributes:
+				//----------------------------------
+				
+				set csr("simple") = $case($zconvert(##'..GetAttribute("simple", "")'##, "u"), "TRUE":1, :0)
+				set csr("mode") = $case(##'..GetAttribute("mode", "")'##, "2":2, "1":1, :3)
+				
+				if (csr("simple")) {
+					
+					//--------------------------------------------------------------------------
+					//
+					// Return just the obfuscated e-mail address.
+					//
+					//--------------------------------------------------------------------------
+					
+					for csr("i")=1:1:$length(csr("email")) set csr("return") = csr("return") _ $$$obfuscator(csr("mode"), $extract(csr("email"), csr("i")))
+					
+				} else {
+					
+					//--------------------------------------------------------------------------
+					//
+					// Return the full link.
+					//
+					//--------------------------------------------------------------------------
+					
+					//----------------------------------
+					// Initialize:
+					//----------------------------------
+					
+					set (csr("temp"), csr("href"), csr("attributes"), csr("link")) = ""
+					set csr("flag") = 0
+					
+					//----------------------------------
+					// Get RULE attributes:
+					//----------------------------------
+					
+					set csr("cc") = ##'..GetAttribute("cc", "")'##
+					set csr("bcc") = ##'..GetAttribute("bcc", "")'##
+					set csr("subject") = ##'..GetAttribute("subject", "")'##
+					set csr("body") = ##'..GetAttribute("body", "")'##
+					set csr("id") = ##'..GetAttribute("id", "")'##
+					set csr("class") = ##'..GetAttribute("class", "")'##
+					set csr("rel") = ##'..GetAttribute("rel", "")'##
+					set csr("title") = ##'..GetAttribute("title", "")'##
+					set csr("text") = ##'..GetAttribute("text", "")'##
+					
+					//----------------------------------
+					// Build "mailto" link:
+					//----------------------------------
+					
+					set csr("temp") = "mailto:" _ ..EscapeURL(csr("email"))
+					
+					if ($length(csr("cc"))) {
+						set csr("temp") = csr("temp") _ $case(csr("flag"), 1:"&amp;", :"?") _ "cc=" _  ..EscapeURL(csr("cc"))
+						set csr("flag") = 1
+					}
+					
+					if ($length(csr("bcc"))) {
+						set csr("temp") = csr("temp") _ $case(csr("flag"), 1:"&amp;", :"?") _ "bcc=" _  ..EscapeURL(csr("bcc"))
+						set csr("flag") = 1
+					}
+					
+					if ($length(csr("subject"))) {
+						set csr("temp") = csr("temp") _ $case(csr("flag"), 1:"&amp;", :"?") _ "subject=" _  ..EscapeURL(csr("subject"))
+						set csr("flag") = 1
+					}
+					
+					if ($length(csr("body"))) {
+						set csr("temp") = csr("temp") _ $case(csr("flag"), 1:"&amp;", :"?") _ "body=" _  ..EscapeURL(csr("body"))
+						set csr("flag") = 1
+					}
+					
+					for i=1:1:$length(csr("temp")) set csr("href") = csr("href") _ $$$obfuscator(csr("mode"), $extract(csr("temp"), i))
+					
+					set csr("temp") = "" // Re-initialize.
+					
+					//----------------------------------
+					// Link attributes:
+					//----------------------------------
+					
+					if ($length(csr("id"))) {
+						set csr("attributes") = " id=""" _ csr("id") _ """"
+					}
+					
+					if ($length(csr("class"))) {
+						set csr("attributes") = csr("attributes") _ " class=""" _ csr("class") _ """"
+					}
+					
+					if ($length(csr("rel"))) {
+						set csr("attributes") = csr("attributes") _ " rel=""" _ csr("rel") _ """"
+					}
+					
+					if ($length(csr("title"))) {
+						set csr("attributes") = csr("attributes") _ " title=""" _ csr("title") _ """"
+					}
+					
+					//----------------------------------
+					// Link text:
+					//----------------------------------
+					
+					set csr("temp") = $select($length(csr("text")):csr("text"), 1:csr("email")) // E-mail or text?
+					
+					for csr("i")=1:1:$length(csr("temp")) set csr("link") = csr("link") _ $$$obfuscator(csr("mode"), $extract(csr("temp"), csr("i")))
+					
+					//----------------------------------
+					// Return link:
+					//----------------------------------
+					
+					set csr("return") = "<a" _ csr("attributes") _ " href=""" _ csr("href") _ """>" _ csr("link") _ "</a>"
+					
+				}
+				
+				//----------------------------------
+				// Garbage collection:
+				//----------------------------------
+				
+				#undef obfuscator
+				
+				//----------------------------------
+				// Setup local variable or write the output:
+				//----------------------------------
+				
+				if ($length(##'..GetAttribute("var", "")'##)) {
+				
+					// Assign output to <csr:children> "local" variable:
+					set @##'..GetAttribute("var")'## = csr("return")
+				
+				} else {
+				
+					// Self-closing tag, so write the return:
+					write csr("return")
+				
+				}
+				
+			}
+			
+			//----------------------------------
+			// Garbage collection:
+			//----------------------------------
+			
+			kill csr
+			
+		</script>
+		
+		<csr:children />
+		
+		<script language="cache" runat="server">
+			
+			if ($length(##'..GetAttribute("var", "")'##)) {
+			
+				//----------------------------------
+				// Garbage collection:
+				//----------------------------------
+				
+				kill @##'..GetAttribute("var")'##
+				
+			}
+			
+		</script>
+		
+		<script language="Cache" runat="compiler">
+			do ..RenderDTEndTag()
+		</script>
+		
+	</csr:action>
+	
+</csr:rule>
